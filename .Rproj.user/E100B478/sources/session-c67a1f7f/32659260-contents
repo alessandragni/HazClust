@@ -1,0 +1,19 @@
+Package: HazClust
+Type: Package
+Title: Hazard Clustering
+Version: 0.0.1
+Authors@R: c(
+    person("Alessandra", "Ragni", email = "alessandra.ragni@polimi.it", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-3647-7340")))
+Description: Tools for clustering based on survival data and hazard functions.
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+License: GPL (>= 3)
+Encoding: UTF-8
+Depends: R (>= 3.5)
+Imports:
+    survival,
+    optimx,
+    sn,
+    igraph
+LazyData: true
