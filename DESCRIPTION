@@ -1,11 +1,11 @@
 Package: HazClust
 Type: Package
-Title: Hazard Clustering
+Title: Clustering of Hazards with Frailties
 Version: 0.0.1
 Authors@R: c(
     person("Alessandra", "Ragni", email = "alessandra.ragni@polimi.it", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-3647-7340")))
-Description: Tools for clustering based on survival data and hazard functions.
+Description: Penalized Likelihood Optimization for Adaptive Neighborhood Clustering in Time-to-Event Data with Group-Level Heterogeneity
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 License: GPL (>= 3)
