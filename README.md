@@ -3,7 +3,7 @@
 The implementation builds on theoretical developments from
 
 > **Penalized Likelihood Optimization for Adaptive Neighborhood Clustering in Time-to-Event Data with Group-Level Heterogeneity**  
-> [arXiv preprint](https://arxiv.org/abs/ADDNUMBERS)
+> [arXiv preprint](https://arxiv.org/abs/2601.07446)
 > by A. Ragni, L. Cavinato, F. Ieva  
 
 The core survival and frailty estimation routines
