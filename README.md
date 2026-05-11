@@ -54,6 +54,7 @@ This folder contains the simulation study described in Section 3 of the paper.
    - the descriptive results in Section 3.1.1
    - Table S6.2 (referenced in Web Supplementary Materials), 
    - Figures 1 and S6.1 in Web Supplementary (both referenced in Section 3.1.3).
+   
    This notebook relies on the outputs stored in the `output/tab2` folder.  
 
 
