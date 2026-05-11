@@ -13,7 +13,7 @@
 #' \code{"lognormal"}, \code{"logskewnormal"}.
 #' @param frailty A character string specifying the frailty distribution. 
 #' One of: \code{"none"}, \code{"gamma"}, \code{"ingau"}, 
-#' \code{"possta"}, \code{"lognormal"}, \code{"loglogistic"}.
+#' \code{"possta"}, \code{"lognormal"}.
 #' @param method Optimization method passed to \code{optimx}.
 #' @param maxitparfm Maximum number of iterations for internal optimization.
 #' @param maxit Maximum number of iterations for optimization.

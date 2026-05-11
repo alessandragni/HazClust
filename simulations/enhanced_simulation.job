@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -l select=1:ncpus=1:mpiprocs=2,walltime=24:00:00
+#PBS -N enhanced_sim
+#PBS -j oe
+
+cd ${PBS_O_WORKDIR}
+source $HOME/spack-1.0/share/spack/setup-env.sh
+spack load r
+
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+
+Rscript /u/ragni/HazClust/simulations/enhanced_simulation_main.R $seed $gammapar $k $c $censor $scenario $type $frailty_intensity

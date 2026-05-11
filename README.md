@@ -18,6 +18,43 @@ This folder contains the main functions to run the proposed method, with main fu
 
 ## `simulations` folder
 This folder contains the simulation study described in Section 3 of the paper.
+ 
+ - `Tab1_Silhouette.ipynb` reproduces the results reported in Table 1 (Section 3.1.1). 
+  The outputs are stored in the `output/tab1` folder.  
+
+  To generate the results, run:
+  ```bash
+  chmod +x submit_Tab1_simulations.sh
+  ./submit_Tab1_simulations.sh
+  ```
+  This script relies on enhanced_simulation.job, enhanced_simulation_main.R, and enhanced_simulate_data.R.
+  
+   - `Tab2_AnalysisAccuracyARI.ipynb` reproduces the results reported in Table 2 (referenced in Section 3.1.2). 
+  The outputs are stored in the `output/tab2` folder.
+  
+  To generate the results, run:
+  ```bash
+  chmod +x submit_Tab2_simulations.sh
+  ./submit_Tab2_simulations.sh
+  ```
+  This script relies on enhanced_simulation.job, enhanced_simulation_main.R, and enhanced_simulate_data.R.
+  
+   
+  - `TabS61_AccuracyARISilhouette.ipynb` reproduces the results reported in Table S6.1 (referenced in Section S6.1). 
+  The outputs are stored in the `output/tabS61` folder.
+  
+  To generate the results, run:
+  ```bash
+  chmod +x submit_TabS61_simulations.sh
+  ./submit_TabS61_simulations.sh
+  ```
+  This script relies on enhanced_simulation.job, enhanced_simulation_main.R, and enhanced_simulate_data.R.
+ 
+  - `TabS62_Figs_Variabandestimation.ipynb` reproduces 
+      - the descriptive results in Section 3.1.1
+      - Table S6.2 (referenced in Web Supplementary Materials), 
+      - Figures 1 and S6.1 in Web Supplementary (both referenced in Section 3.1.3).
+   This notebook relies on the outputs stored in the `output/tab2` folder.  
 
 
 ## References

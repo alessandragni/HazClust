@@ -52,7 +52,7 @@ One of: \code{"weibull"}, \code{"inweibull"}, \code{"frechet"},
 
 \item{frailty}{A character string specifying the frailty distribution.
 One of: \code{"none"}, \code{"gamma"}, \code{"ingau"},
-\code{"possta"}, \code{"lognormal"}, \code{"loglogistic"}.}
+\code{"possta"}, \code{"lognormal"}.}
 
 \item{method}{Optimization method passed to \code{optimx}.}
 
