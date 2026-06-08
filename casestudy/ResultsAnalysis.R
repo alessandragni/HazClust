@@ -1,9 +1,5 @@
 # ============================================================
 # Section 4.3
-#   1. Table 5  – Cluster composition (covariates + mortality)
-#   2. Figure A – KM curves stratified by cluster
-#   3. Figure B – Frailty-adjusted linear predictor by cluster
-#   4. Figure C – Patient similarity graph coloured by cluster
 # ============================================================
 library(roxygen2)
 roxygenise()
@@ -13,6 +9,7 @@ library(survminer)
 library(ggplot2)
 library(dplyr)
 library(cowplot)
+library(patchwork)
 library(igraph)
 library(ggraph)
 library(tidygraph)
@@ -34,15 +31,29 @@ sim_data$clusters <- as.factor(xx$clusters)
 # Cluster labels (adjust order if needed after inspecting mortality rates)
 levels(sim_data$clusters) <- c("Cluster 1", "Cluster 2", "Cluster 3")
 
-# Dark2 palette – consistent across all figures
-clust_colors <- c("Cluster 1" = "#1B9E77",
-                  "Cluster 2" = "#D95F02",
-                  "Cluster 3" = "#7570B3")
+clust_colors <- c("Cluster 1" = "#F4D03F",   # bright yellow      (very light)
+                  "Cluster 2" = "#2E86AB",   # medium blue        (medium)
+                  "Cluster 3" = "#1B1B1E")   # near black         (very dark)
 
+library(dplyr)
 
-# ── 1. CLUSTER COMPOSITION TABLE ────────────────────────────
-# Compute summary statistics per cluster
+# ── 1. COMPUTE P-VALUES ───────────────────────────────────────
+# We run the appropriate statistical test for each variable across clusters
 
+p_age  <- anova(lm(ETA_AL_RICOVERO ~ as.factor(clusters), data = sim_data))$"Pr(>F)"[1]
+p_gen  <- chisq.test(table(sim_data$SESSO, sim_data$clusters))$p.value
+p_mcs  <- kruskal.test(MCS ~ as.factor(clusters), data = sim_data)$p.value
+p_resp <- kruskal.test(RESP ~ as.factor(clusters), data = sim_data)$p.value
+p_stat <- chisq.test(table(sim_data$cens, sim_data$clusters))$p.value
+p_time <- anova(lm(time ~ as.factor(clusters), data = sim_data))$"Pr(>F)"[1]
+
+# Helper function to format p-values nicely (<0.001 instead of 0.000)
+format_p <- function(p) {
+  if (p < 0.001) return("<0.001")
+  else return(sprintf("%.3f", p))
+}
+
+# ── 2. YOUR ORIGINAL AGGREGATION CODE ────────────────────────
 comp_table <- sim_data %>%
   group_by(clusters) %>%
   summarise(
@@ -65,31 +76,24 @@ comp_table <- sim_data %>%
     Resp    = sprintf("%.2f (%.2f)", Resp_mean,   Resp_sd),
     Male    = sprintf("%.1f%%",      Male_pct),
     Mort    = sprintf("%.1f%%",      Mortality_pct),
-    Time    = sprintf("%.1f (%.1f)", Time_mean,   Time_sd)
+    Time    = sprintf("%.2f (%.2f)", Time_mean,   Time_sd)
   ) %>%
   select(clusters, N, Age, Male, ModMCS, Resp, Mort, Time)
 
-names(comp_table) <- c("Cluster", "N",
-                       "Age, mean (SD)",
-                       "Male, %",
-                       "ModMCS, mean (SD)",
-                       "Resp, mean (SD)",
-                       "90-day mortality",
-                       "Follow-up time, mean (SD)")
+# ── 3. MERGE P-VALUES INTO A FINAL FORMATTED TABLE ───────────
 
-# Print to console
-print(comp_table)
+# Transpose the cluster summary data to match your image layout
+final_table <- data.frame(
+  Variable = c("Patients", "Age", "Gender", "ModMCS", "Resp", "Status", "Time"),
+  Cluster_1 = c(comp_table$N[1], comp_table$Age[1], comp_table$Male[1], comp_table$ModMCS[1], comp_table$Resp[1], comp_table$Mort[1], comp_table$Time[1]),
+  Cluster_2 = c(comp_table$N[2], comp_table$Age[2], comp_table$Male[2], comp_table$ModMCS[2], comp_table$Resp[2], comp_table$Mort[2], comp_table$Time[2]),
+  Cluster_3 = c(comp_table$N[3], comp_table$Age[3], comp_table$Male[3], comp_table$ModMCS[3], comp_table$Resp[3], comp_table$Mort[3], comp_table$Time[3]),
+  P_value   = c("--", format_p(p_age), format_p(p_gen), format_p(p_mcs), format_p(p_resp), format_p(p_stat), format_p(p_time))
+)
 
-# LaTeX version for the paper
-comp_table %>%
-  kbl(booktabs = TRUE, align = "lrcccccc",
-      caption = "Cluster composition: covariate profiles and event rates for the three clusters identified in the Enhance-Heart cohort.") %>%
-  kable_styling(latex_options = c("hold_position")) %>%
-  save_kable("table5_cluster_composition.tex")
+print(final_table)
 
-# Also save as CSV for convenience
-# write.csv(comp_table, "table5_cluster_composition.csv", row.names = FALSE)
-# cat("Table saved.\n")
+
 
 
 # ── 2. KAPLAN-MEIER CURVES BY CLUSTER ───────────────────────
@@ -100,19 +104,20 @@ fig_km <- ggsurvplot(
   data          = sim_data,
   palette       = unname(clust_colors),
   linetype      = c("solid", "dashed", "dotdash"),   # B&W-safe
-  size          = 0.9,
+  linewidth     = 0.9,
   risk.table    = TRUE,
   risk.table.height = 0.28,
   risk.table.fontsize = 3.2,
-  xlab          = "Time (days)",
+  xlab          = "Time",
   ylab          = "Survival probability",
   legend.title  = "",
   legend.labs   = names(clust_colors),
   conf.int      = TRUE,
   conf.int.alpha = 0.10,
-  ggtheme       = theme_classic(base_size = 11) +
+  ggtheme       = theme_classic(base_size = 15) +
     theme(legend.position = "bottom")
 )
+
 
 # Add log-rank p-value annotation
 fig_km$plot <- fig_km$plot +
@@ -120,7 +125,7 @@ fig_km$plot <- fig_km$plot +
            label = paste0("Log-rank p ", 
                           format.pval(surv_pvalue(km_fit, sim_data)$pval, 
                                       digits = 2, eps = 0.001)),
-           hjust = 1.05, vjust = 1.5, size = 3.2, fontface = "italic")
+           hjust = 1.05, vjust = 1.5, size = 6, fontface = "italic")
 
 # Save
 # pdf("figure_km_by_cluster.pdf", width = 7, height = 6)
@@ -128,15 +133,18 @@ print(fig_km)
 # dev.off()
 cat("KM figure saved.\n")
 
-# Note for the paper: if KM curves show partial overlap, add the sentence:
-# "KM estimates are marginal and do not condition on the frailty term;
-#  the frailty-adjusted risk separation is illustrated in Figure X."
+
+ggsave(
+  filename = "casestudy/result/KaplanMeier.pdf",
+  plot     = fig_km$plot,
+  width    = 8,
+  height   = 6,
+  device   = "pdf"
+)
+
 
 
 # ── 3. FRAILTY-ADJUSTED LINEAR PREDICTOR BY CLUSTER ─────────
-# This is the quantity the clustering actually partitions: x'β + log(û_g)
-# Requires: estimated beta, estimated frailties per hospital, 
-#           and hospital membership per patient.
 
 # --- Extract beta estimates from model output ---
 # Adjust field names to match your xx object structure
@@ -391,120 +399,40 @@ sim_data$log_u_g  <- eta_obj$log_u_g
 
 
 
-# ── Hospital-level posterior frailty + cluster composition ────────────────
-
-hosp_frailty <- sim_data %>%
-  group_by(COD_OSPEDALE) %>%
-  summarise(
-    log_u_hat = mean(log_u_g),
-    u_hat     = exp(mean(log_u_g)),
-    n_patients = n(),
-    .groups = "drop"
-  )
-
-# Compute cluster proportions within hospital
-hosp_cluster_prop <- sim_data %>%
-  group_by(COD_OSPEDALE, clusters) %>%
-  summarise(n_cluster = n(), .groups = "drop") %>%
-  left_join(
-    sim_data %>%
-      group_by(COD_OSPEDALE) %>%
-      summarise(n_total = n(), .groups = "drop"),
-    by = "COD_OSPEDALE"
-  ) %>%
-  mutate(prop_cluster = n_cluster / n_total)
-
-# Keep dominant cluster only
-dominant_cluster <- hosp_cluster_prop %>%
-  group_by(COD_OSPEDALE) %>%
-  slice_max(prop_cluster, n = 1, with_ties = FALSE) %>%
-  ungroup() %>%
-  select(COD_OSPEDALE,
-         dominant_cluster = clusters,
-         dominant_prop = prop_cluster)
-
-# Merge
-hosp_frailty <- hosp_frailty %>%
-  left_join(dominant_cluster, by = "COD_OSPEDALE") %>%
-  arrange(u_hat) %>%
-  mutate(
-    hosp_rank = factor(row_number(), levels = row_number()),
-    dominant_pct = 100 * dominant_prop
-  )
-
-
-
-
-fig_frailty <- ggplot(
-  hosp_frailty,
-  aes(
-    x = hosp_rank,
-    y = u_hat,
-    colour = dominant_cluster,
-    size = dominant_pct
-  )
-) +
-  geom_hline(
-    yintercept = 1,
-    linetype = "dashed",
-    colour = "grey50",
-    linewidth = 0.5
-  ) +
-  
-  geom_point(alpha = 0.9) +
-  
-  geom_text(
-    aes(label = sprintf("%.0f%%", dominant_pct)),
-    vjust = -1,
-    size = 2.8,
-    show.legend = FALSE
-  ) +
-  
-  scale_colour_manual(
-    values = clust_colors,
-    name = "Dominant cluster"
-  ) +
-  
-  scale_size_continuous(
-    range = c(2.5, 8),
-    name = "% patients in dominant cluster"
-  ) +
-  
-  labs(
-    x = "Hospital (ranked by posterior frailty)",
-    y = expression(hat(u)[g]),
-    title = "Posterior frailty estimates by hospital"
-  ) +
-  
-  theme_classic(base_size = 11) +
-  
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "bottom",
-    plot.title = element_text(size = 11, hjust = 0.5)
-  )
-
-fig_frailty
-
-
-
 
 # ── Hospital-level decomposition ------------------------------------------
+
 
 hosp_summary <- sim_data %>%
   group_by(COD_OSPEDALE) %>%
   summarise(
-    mean_xbeta  = mean(xbeta),
-    mean_log_u  = mean(log_u_g),
-    u_hat       = exp(mean(log_u_g)),
-    mean_eta    = mean(lin_pred),
-    n_patients  = n(),
+    mean_xbeta = mean(xbeta),
+    mean_log_u = mean(log_u_g),
+    u_hat      = exp(mean(log_u_g)),
+    mean_eta   = mean(lin_pred),
+    n_patients = n(),
     .groups = "drop"
   )
 
+hosp_cluster_comp <- sim_data %>%
+  group_by(COD_OSPEDALE, clusters) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(COD_OSPEDALE) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
 
-# Dominant cluster info
+# dominant cluster per hospital
+dominant_cluster <- hosp_cluster_comp %>%
+  group_by(COD_OSPEDALE) %>%
+  slice_max(prop, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    COD_OSPEDALE,
+    dominant_cluster = clusters,
+    dominant_prop = prop
+  )
+
+# merge into hospital summary
 hosp_summary <- hosp_summary %>%
   left_join(dominant_cluster, by = "COD_OSPEDALE") %>%
   mutate(
@@ -512,93 +440,184 @@ hosp_summary <- hosp_summary %>%
   ) %>%
   arrange(u_hat)
 
-# Shared ordering
+# shared ordering
 hospital_order <- hosp_summary$COD_OSPEDALE
+
+
 
 
 fig_A <- ggplot(
   hosp_summary,
-  aes(
-    x = factor(COD_OSPEDALE, levels = hospital_order),
-    y = u_hat,
-    colour = dominant_cluster,
-    size = dominant_pct
-  )
+  aes(x = factor(COD_OSPEDALE, levels = hospital_order),
+      y = u_hat,
+      colour = dominant_cluster,
+      size = dominant_pct)
 ) +
-  geom_hline(
-    yintercept = 1,
-    linetype = "dashed",
-    colour = "grey50"
-  ) +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
   geom_point(alpha = 0.9) +
-  scale_colour_manual(values = clust_colors) +
-  theme_classic(base_size = 11) +
+  scale_colour_manual(values = clust_colors, name = NULL) +
+  scale_size_continuous(
+    range  = c(1.5, 6),
+    name   = "%",
+    breaks = c(50, 75, 100)
+  ) +
+  guides(
+    colour = guide_legend(order = 1, override.aes = list(size = 3)),
+    size   = guide_legend(order = 2)
+  ) +
+  theme_classic(base_size = 15) +
   theme(
-    axis.text.x = element_blank(),
+    axis.text.x  = element_blank(),
     axis.ticks.x = element_blank(),
-    legend.position = "bottom"
+    legend.position = "top",
+    legend.box = "horizontal"
   ) +
   labs(
     x = NULL,
-    y = expression(hat(u)[g]),
-    title = "Hospital frailty"
+    y = expression(hat(u)[g]) #,
+    #title = "Posterior frailty and cluster composition by hospital"
   )
 
-
-
-fig_B <- ggplot(sim_data,
-                aes(
-                  x = reorder(COD_OSPEDALE, xbeta, median),
-                  y = xbeta
-                )) +
-  geom_boxplot(outlier.size = 0.3) +
-  theme_classic()
-
-
-fig_C <- hosp_cluster_prop %>%
-  mutate(
-    COD_OSPEDALE = factor(
-      COD_OSPEDALE,
-      levels = hospital_order
-    )
-  ) %>%
-  ggplot(
-    aes(
-      x = COD_OSPEDALE,
-      y = prop_cluster,
-      fill = clusters
-    )
-  ) +
+fig_C <- hosp_cluster_comp %>%
+  mutate(COD_OSPEDALE = factor(COD_OSPEDALE, levels = hospital_order)) %>%
+  ggplot(aes(x = COD_OSPEDALE, y = prop, fill = clusters)) +
   geom_col(width = 0.9) +
-  scale_fill_manual(values = clust_colors) +
+  scale_fill_manual(values = clust_colors, name = NULL) +
   scale_y_continuous(labels = scales::percent_format()) +
-  theme_classic(base_size = 11) +
+  theme_classic(base_size = 15) +
   theme(
-    axis.text.x = element_blank(),
+    axis.text.x  = element_blank(),
     axis.ticks.x = element_blank(),
-    legend.position = "bottom"
+    legend.position = "none"
   ) +
   labs(
-    x = "Hospitals",
-    y = "Cluster composition",
-    fill = "Cluster",
-    title = "Patient cluster composition"
+    x = "Hospitals (ranked by increasing posterior frailty)",
+    y = "Proportion of patients",
+    title = NULL
   )
 
-combined_fig <- cowplot::plot_grid(
-  fig_A,
-  fig_B,
-  fig_C,
-  ncol = 1,
-  align = "v",
-  rel_heights = c(1.2, 0.8, 1)
-)
+combined_fig <- (fig_A / fig_C) +
+  plot_layout(heights = c(1.2, 1))
 
 combined_fig
 
+ggsave(
+  filename = "casestudy/result/frailty.pdf",
+  plot     = combined_fig,
+  width    = 7,
+  height   = 7,
+  device   = "pdf"
+)
 
 
-# “Average patient-level risk based on observed covariates was relatively homogeneous across hospitals, whereas posterior frailty estimates showed substantial heterogeneity. This suggests that the identified clusters primarily capture latent institutional or unmeasured risk structure rather than differences in observed patient severity.”
+
+
+
+# ── Cluster-specific survival curves ────────────────────────────────────────
+# Parameters are stored on log scale (transform=TRUE), so exponentiate first
+lambda_hat <- exp(xx$estimate[which(names(xx$estimate) == "lambda")])
+rho_hat    <- exp(xx$estimate[which(names(xx$estimate) == "rho")])
+
+# Time grid up to 99th percentile of observed times
+times <- seq(0, quantile(sim_data$time, 0.99), length.out = 300)
+
+surv_cluster <- bind_rows(lapply(levels(sim_data$clusters), function(cl) {
+  
+  idx <- sim_data$clusters == cl
+  eta <- sim_data$lin_pred[idx]   # x'β + log(û_g) — already computed
+  
+  # S(t | x_i, u_{g(i)}) averaged over patients in this cluster
+  # outer() gives an [n_cl × 300] matrix, colMeans marginalises over patients
+  S_mat <- outer(exp(eta), times,
+                 function(e, t) exp(-lambda_hat * t^rho_hat * e))
+  
+  data.frame(
+    time    = times,
+    surv    = colMeans(S_mat),
+    cluster = cl
+  )
+}))
+
+# ── Plot ─────────────────────────────────────────────────────────────────────
+ggplot(surv_cluster, aes(x = time, y = surv, colour = cluster, linetype = cluster)) +
+  geom_line(linewidth = 0.9) +
+  scale_colour_manual(values = clust_colors, name = NULL) +
+  scale_linetype_manual(values = c("solid", "dashed", "dotdash"), name = NULL) +
+  scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+  labs(
+    x = "Time",
+    y = "Survival probability",
+    title = "Frailty-adjusted survival by cluster"
+  ) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "bottom")
+
+
+
+ggplot(surv_cluster, aes(x = time, y = surv, 
+                         colour = cluster, linetype = cluster)) +
+  geom_line(linewidth = 0.9) +
+  scale_colour_manual(values = clust_colors, name = NULL) +
+  scale_linetype_manual(values = c("solid", "dashed", "dotdash"), name = NULL) +
+  scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+  labs(
+    x = "Time",
+    y = "Survival probability",
+    title = "Frailty-adjusted survival by cluster"
+  ) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "bottom")
+
+
+
+# Build individual survival curves for every patient
+indiv_surv <- bind_rows(lapply(seq_len(nrow(sim_data)), function(i) {
+  eta_i <- sim_data$lin_pred[i]
+  data.frame(
+    time    = times,
+    surv    = exp(-lambda_hat * times^rho_hat * exp(eta_i)),
+    cluster = sim_data$clusters[i],
+    patient = i
+  )
+}))
+
+
+
+
+lastfig = ggplot() +
+  # Individual curves
+  geom_line(data = indiv_surv, 
+            aes(x = time, y = surv, group = patient, colour = cluster),
+            alpha = 0.05, linewidth = 0.2) +
+  # Cluster averages on top
+  geom_line(data = surv_cluster,
+            aes(x = time, y = surv, colour = cluster, linetype = cluster),
+            linewidth = 1.2) +
+  scale_colour_manual(values = clust_colors, name = NULL) +
+  scale_fill_manual(values = clust_colors, name = NULL) +
+  scale_linetype_manual(values = c("solid", "dashed", "dotdash"), name = NULL) +
+  scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+  labs(
+    x = "Time",
+    y = "Survival probability" #,
+    #title = "Individual and average frailty-adjusted survival by cluster"
+  ) +
+  theme_classic(base_size = 15) +
+  theme(legend.position = "top")
+
+
+lastfig
+
+ggsave(
+  filename = "casestudy/result/Survivalprob.pdf",
+  plot     = lastfig,
+  width    = 7,
+  height   = 7,
+  device   = "pdf"
+)
+
+
+
 
 
 
@@ -621,10 +640,10 @@ fig_lp <- ggplot(sim_data, aes(x = clusters, y = lin_pred, fill = clusters)) +
   scale_fill_manual(values = clust_colors) +
   labs(x = NULL,
        y = expression(italic(x)[gi]^T * hat(beta) + log ~ hat(u)[g]),
-       title = "Frailty-adjusted log-hazard by cluster") +
-  theme_classic(base_size = 11) +
+       title = expression(italic(x)[gi]^T * hat(beta) + log ~ hat(u)[g])) +
+  theme_classic(base_size = 15) +
   theme(legend.position = "none",
-        plot.title = element_text(size = 11, hjust = 0.5))
+        plot.title = element_text(size = 17, hjust = 0.5))
 
 fig_lp
 
@@ -657,14 +676,14 @@ fig_xbeta <- ggplot(
   labs(
     x = NULL,
     y = expression(italic(x)[gi]^T * hat(beta)),
-    title = expression("Observed risk component " * (X * hat(beta)))
+    title = expression(italic(x)[gi]^T * hat(beta))
   ) +
   
-  theme_classic(base_size = 11) +
+  theme_classic(base_size = 15) +
   
   theme(
     legend.position = "none",
-    plot.title = element_text(size = 11, hjust = 0.5)
+    plot.title = element_text(size = 17, hjust = 0.5)
   )
 
 fig_xbeta
@@ -697,7 +716,7 @@ fig_logu <- ggplot(
     title = "Latent frailty contribution by cluster"
   ) +
   
-  theme_classic(base_size = 11) +
+  theme_classic(base_size = 15) +
   
   theme(
     legend.position = "none",
@@ -709,196 +728,23 @@ fig_logu
 
 
 
-plot_grid(
-  fig_xbeta,
-  fig_logu,
+XX = plot_grid(
+  #fig_logu,
   fig_lp,
-  ncol = 3
+  fig_xbeta,
+  ncol = 2 #3
+)
+
+XX
+
+
+ggsave(
+  filename = "casestudy/result/LogHazard.pdf",
+  plot     = XX,
+  width    = 11,
+  height   = 7,
+  device   = "pdf"
 )
 
 
 
-
-# Centering and scaling the components
-sim_data$xbeta_c   <- as.numeric(scale(sim_data$xbeta))
-sim_data$logu_c    <- as.numeric(scale(sim_data$log_u_g))
-sim_data$linpred_c <- as.numeric(scale(sim_data$lin_pred))
-
-
-library(ggplot2)
-library(cowplot)
-
-# 1. Scaled Observed Risk
-fig_xbeta_c <- ggplot(sim_data, aes(x = clusters, y = xbeta_c, fill = clusters)) +
-  geom_violin(alpha = 0.4, trim = FALSE, linewidth = 0.4) +
-  geom_boxplot(width = 0.18, outlier.size = 0.8, outlier.alpha = 0.4, fill = "white") +
-  scale_fill_manual(values = clust_colors) +
-  labs(x = NULL, y = "Std. units", title = expression("Scaled " * X * hat(beta))) +
-  theme_classic(base_size = 11) +
-  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
-
-# 2. Scaled Latent Frailty
-fig_logu_c <- ggplot(sim_data, aes(x = clusters, y = logu_c, fill = clusters)) +
-  geom_violin(alpha = 0.4, trim = FALSE, linewidth = 0.4) +
-  geom_boxplot(width = 0.18, outlier.size = 0.8, outlier.alpha = 0.4, fill = "white") +
-  scale_fill_manual(values = clust_colors) +
-  labs(x = NULL, y = "Std. units", title = expression("Scaled " * log(hat(u)[g]))) +
-  theme_classic(base_size = 11) +
-  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
-
-# 3. Scaled Linear Predictor (Total)
-fig_lp_c <- ggplot(sim_data, aes(x = clusters, y = linpred_c, fill = clusters)) +
-  geom_violin(alpha = 0.4, trim = FALSE, linewidth = 0.4) +
-  geom_boxplot(width = 0.18, outlier.size = 0.8, outlier.alpha = 0.4, fill = "white") +
-  scale_fill_manual(values = clust_colors) +
-  labs(x = NULL, y = "Std. units", title = "Scaled Total Hazard") +
-  theme_classic(base_size = 11) +
-  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
-
-# Combine
-plot_grid(fig_xbeta_c, fig_logu_c, fig_lp_c, ncol = 3)
-
-
-
-
-
-
-# ── 4. PATIENT SIMILARITY GRAPH ─────────────────────────────
-S  <- xx$S
-g_sim <- graph_from_adjacency_matrix(S, mode = "undirected",
-                                     weighted = TRUE, diag = FALSE)
-
-# Attach cluster membership as node attribute
-V(g_sim)$cluster <- as.character(sim_data$clusters)
-
-set.seed(42)
-fig_graph <- ggraph(g_sim, layout = "fr") +    # Fruchterman-Reingold
-  geom_edge_link(alpha = 0.015, colour = "grey60") +
-  geom_node_point(aes(colour = cluster), size = 0.7, alpha = 0.85) +
-  scale_colour_manual(values = clust_colors, name = "") +
-  guides(colour = guide_legend(override.aes = list(size = 3))) +
-  theme_void(base_size = 11) +
-  theme(legend.position = "bottom")
-
-ggsave("figure_similarity_graph.pdf", fig_graph, width = 6, height = 5.5)
-cat("Graph figure saved.\n")
-
-
-# ── 5. QUICK SANITY CHECK: mortality rate per cluster ────────
-cat("\n--- Observed 90-day mortality by cluster ---\n")
-sim_data %>%
-  group_by(clusters) %>%
-  summarise(N = n(),
-            Deaths = sum(cens),
-            Mortality_pct = mean(cens) * 100) %>%
-  print()
-
-
-
-
-
-# ── 6. POSTERIOR FRAILTY ESTIMATES BY HOSPITAL ──────────────────────────────
-
-
-hosp_cluster_comp <- sim_data %>%
-  group_by(COD_OSPEDALE, clusters) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  group_by(COD_OSPEDALE) %>%
-  mutate(prop = n / sum(n)) %>%
-  ungroup()
-
-fig_hosp_comp <- ggplot(hosp_cluster_comp,
-                        aes(x = reorder(COD_OSPEDALE, prop, FUN = max),
-                            y = prop,
-                            fill = clusters)) +
-  geom_col() +
-  scale_fill_manual(values = clust_colors) +
-  labs(x = "Hospital",
-       y = "Proportion of patients",
-       fill = "Cluster",
-       title = "Patient cluster composition within hospitals") +
-  theme_classic(base_size = 11) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
-
-fig_hosp_comp
-
-# Safe extraction: regress out Xbeta within each hospital
-# log(u_hat_g) = mean of (lin_pred - Xbeta_i) within hospital g
-# But get Xbeta correctly by matching parameter names exactly
-
-# Check exact names first
-print(names(xx$estimate))
-# e.g. "theta" "rho" "lambda" "ETA_AL_RICOVERO" "SESSOF" "MCS" "RESP"
-#                                                  ^^ might be SESSOF not SESSO_M
-
-# Extract beta with correct names - adjust "SESSOF" to whatever appears
-beta_names <- names(xx$estimate)[-(1:3)]  # drop theta, rho, lambda
-beta_est   <- xx$estimate[beta_names]
-print(beta_est)  # confirm these look like regression coefficients
-
-# Build X matching exactly the order in beta_est
-# Inspect what the reference level of SESSO is:
-print(levels(as.factor(sim_data$SESSO)))  # e.g. "F" "M" -> reference is "F", dummy is "M"
-
-# Build covariate matrix to match model matrix
-X <- model.matrix(~ ETA_AL_RICOVERO + SESSO + MCS + RESP, data = sim_data)
-# Drop intercept column, keep only the columns matching beta_names
-X_beta <- X[, beta_names, drop = FALSE]
-Xbeta  <- as.numeric(X_beta %*% beta_est)
-
-# Now extract log frailty
-sim_data$log_u_hat <- sim_data$lin_pred - Xbeta
-
-# Verify: SD within each hospital should be ~0
-check <- sim_data %>%
-  group_by(COD_OSPEDALE) %>%
-  summarise(sd_logu = sd(log_u_hat), .groups = "drop")
-print(check)  # all sd_logu should be < 1e-10
-
-
-
-hosp_frailty <- sim_data %>%
-  group_by(COD_OSPEDALE) %>%
-  summarise(
-    u_hat            = exp(mean(log_u_hat)),
-    n_patients       = n(),
-    dominant_cluster = names(which.max(table(clusters))),
-    .groups          = "drop"
-  ) %>%
-  arrange(u_hat) %>%
-  mutate(hosp_rank = factor(row_number(), levels = row_number()))
-
-# Sanity check - should have 32 rows, no NAs
-print(nrow(hosp_frailty))
-print(summary(hosp_frailty$u_hat))
-
-fig_frailty <- ggplot(hosp_frailty,
-                      aes(x = hosp_rank, y = u_hat, colour = dominant_cluster)) +
-  geom_hline(yintercept = 1, linetype = "dashed", 
-             colour = "grey50", linewidth = 0.5) +
-  geom_point(size = 3) +
-  scale_colour_manual(values = clust_colors, name = "Dominant cluster") +
-  labs(x     = "Hospital (ranked by frailty estimate)",
-       y     = expression(hat(u)[g]),
-       title = "Posterior frailty estimates by hospital") +
-  theme_classic(base_size = 11) +
-  theme(axis.text.x  = element_blank(),
-        axis.ticks.x = element_blank(),
-        legend.position = "bottom",
-        plot.title = element_text(size = 11, hjust = 0.5))
-
-fig_frailty
-
-
-
-# Variance decomposition of the linear predictor
-var_total  <- var(sim_data$lin_pred)
-var_Xbeta  <- var(Xbeta)
-var_logu   <- var(sim_data$log_u_hat)
-cov_term   <- 2 * cov(Xbeta, sim_data$log_u_hat)
-
-cat("Var(x'beta):       ", round(var_Xbeta / var_total * 100, 1), "%\n")
-cat("Var(log u_hat):    ", round(var_logu  / var_total * 100, 1), "%\n")
-cat("2*Cov term:        ", round(cov_term  / var_total * 100, 1), "%\n")
-cat("Total:             ", round((var_Xbeta + var_logu + cov_term) / var_total * 100, 1), "%\n")
