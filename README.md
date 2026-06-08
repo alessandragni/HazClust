@@ -57,6 +57,9 @@ This folder contains the simulation study described in Section 3 of the paper.
    
    This notebook relies on the outputs stored in the `output/tab2` folder.  
 
+## `casestudy` folder
+This folder contains the case study described in Section 4 of the paper.
+
 
 ## References
 [1] Munda, M., Rotolo, F., & Legrand, C. (2012). parfm: Parametric frailty models in R. Journal of Statistical Software, 51, 1-20.
