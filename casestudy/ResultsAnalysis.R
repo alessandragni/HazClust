@@ -77,8 +77,8 @@ comp_table <- sim_data %>%
     Male    = sprintf("%.1f%%",      Male_pct),
     Mort    = sprintf("%.1f%%",      Mortality_pct),
     Time    = sprintf("%.2f (%.2f)", Time_mean,   Time_sd)
-  ) %>%
-  select(clusters, N, Age, Male, ModMCS, Resp, Mort, Time)
+  ) #%>%
+  #select(clusters, N, Age, Male, ModMCS, Resp, Mort, Time)
 
 # ── 3. MERGE P-VALUES INTO A FINAL FORMATTED TABLE ───────────
 
@@ -634,7 +634,7 @@ sim_data %>%
 
 # Violin + boxplot
 fig_lp <- ggplot(sim_data, aes(x = clusters, y = lin_pred, fill = clusters)) +
-  geom_violin(alpha = 0.4, trim = FALSE, linewidth = 0.4) +
+  geom_violin(alpha = 0.8, trim = FALSE, linewidth = 0.4) +
   geom_boxplot(width = 0.18, outlier.size = 0.8, outlier.alpha = 0.4,
                fill = "white", linewidth = 0.5) +
   scale_fill_manual(values = clust_colors) +
@@ -647,6 +647,14 @@ fig_lp <- ggplot(sim_data, aes(x = clusters, y = lin_pred, fill = clusters)) +
 
 fig_lp
 
+ggsave(
+  filename = "casestudy/result/fig_lp.pdf",
+  plot     = fig_lp,
+  width    = 7,
+  height   = 7,
+  device   = "pdf"
+)
+
 # ggsave("figure_linpred_by_cluster.pdf", fig_lp, width = 5, height = 4.5)
 # cat("Linear predictor figure saved.\n")
 
@@ -658,7 +666,7 @@ fig_xbeta <- ggplot(
 ) +
   
   geom_violin(
-    alpha = 0.4,
+    alpha = 0.8,
     trim = FALSE,
     linewidth = 0.4
   ) +
@@ -688,6 +696,14 @@ fig_xbeta <- ggplot(
 
 fig_xbeta
 
+ggsave(
+  filename = "casestudy/result/fig_xbeta.pdf",
+  plot     = fig_xbeta,
+  width    = 7,
+  height   = 7,
+  device   = "pdf"
+)
+
 
 fig_logu <- ggplot(
   sim_data,
@@ -695,7 +711,7 @@ fig_logu <- ggplot(
 ) +
   
   geom_violin(
-    alpha = 0.4,
+    alpha = 0.8,
     trim = FALSE,
     linewidth = 0.4
   ) +

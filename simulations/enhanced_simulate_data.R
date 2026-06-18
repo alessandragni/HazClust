@@ -96,19 +96,19 @@ paper_simulate_data_enhanced <- function(
   
   # ----- 4. Covariate from latent predictors -----
   if (mismatch == TRUE){
-    eps_x <- rnorm(N, mean = 0, sd = 1)
+    eps_x <- rnorm(N, mean = 0, sd = 1.5) 
     x <- (eta - log_u) / beta + eps_x
   } else {
     x <- (eta - log_u) / beta
   }
-  x <- (eta - log_u) / beta
+  # x <- (eta - log_u) / beta
   X <- matrix(x, ncol = 1)
   colnames(X) <- "Z1"
   
   # ----- 5. Baseline hazard (DGP) via inverse cumulative hazard -----
   U <- runif(N)
   # if (mismatch == TRUE){
-  #   beta1 <- 0.2   
+  #   beta1 <- beta/100   
   #   lp <- beta1 * x + log_u
   # } else {
   #   lp <- beta * x + log_u

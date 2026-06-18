@@ -31,7 +31,7 @@ formula = Surv(time, cens) ~ ETA_AL_RICOVERO + SESSO + MCS + RESP
 strata = NULL
 transform = TRUE
 
-# parfm::parfm(formula = formula, cluster = cluster, data = sim_data, dist = base, frailty = frailty)
+parfm::parfm(formula = formula, cluster = cluster, data = sim_data, dist = base, frailty = frailty)
 
 xx <- tryCatch({
   HazClust(
